@@ -43,7 +43,9 @@ def apply_data_table_fractional_sizes(win: QMainWindow):
 
 # -------------------- Upload logic --------------------
 def upload_file_and_display(tabs: QTabWidget):
-    file_path, _ = QFileDialog.getOpenFileName(None, "Open File", "", "Data Files (*.csv *.xlsx *.tsv)")
+    file_path, _ = QFileDialog.getOpenFileName(
+        None, "Open File", "", "Data Files (*.csv *.xlsx *.tsv)"
+    )
     if not file_path:
         return
     try:
@@ -53,13 +55,19 @@ def upload_file_and_display(tabs: QTabWidget):
         else:
             df = pd.read_excel(file_path)
 
+        # --- RESET previous selections/fields for this Data tab ---
+        if hasattr(tabs.data_page, "data_selector"):
+            tabs.data_page.data_selector.reset()
+        if hasattr(tabs.data_page, "data_individuals"):
+            tabs.data_page.data_individuals.reset()
+
+        # --- Show table ---
         tabs.data_table.display_dataframe(df)
 
-        # populate selectors
+        # --- Populate selectors with fresh data ---
         if hasattr(tabs.data_page, "data_selector"):
             tabs.data_page.data_selector.load_columns(df.columns.astype(str).tolist())
         if hasattr(tabs.data_page, "data_individuals"):
-            # first column as IDs
             ids = df.iloc[:, 0].dropna().astype(str).unique().tolist()
             tabs.data_page.data_individuals.load_items(ids)
 
@@ -68,6 +76,7 @@ def upload_file_and_display(tabs: QTabWidget):
                 f"Data Preview — {len(df)} individuals, {len(df.columns)} observables"
             )
         tabs.setCurrentWidget(tabs.data_page)
+
     except Exception as e:
         print(f"[ERROR] Failed to load file: {e}")
 

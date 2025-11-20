@@ -115,6 +115,13 @@ class ColumnSelector(QWidget):
     def get_selected(self):
         return [self.selected.item(i).text() for i in range(self.selected.count())]
 
+    def reset(self):
+        """Clear all state when a new dataset is loaded."""
+        self.search.clear()
+        self.available.clear()
+        self.selected.clear()
+        self._all_cols = []
+        self._filtered = []
 
 class IndividualSelector(QWidget):
     """
@@ -208,7 +215,13 @@ class IndividualSelector(QWidget):
         return [self.selected.item(i).text() for i in range(self.selected.count())]
 
 
-
+    def reset(self):
+        """Clear all state when a new dataset is loaded."""
+        self.search.clear()
+        self.available.clear()
+        self.selected.clear()
+        self._all_people = []
+        self._filtered = []
 
 
 
