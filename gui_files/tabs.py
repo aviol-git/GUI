@@ -3,6 +3,7 @@
 
 import os
 import shutil
+from tab_utils import enable_column_distribution_menu
 
 from PyQt5.QtCore import Qt, QStandardPaths
 from PyQt5.QtGui import QColor, QPalette
@@ -266,6 +267,8 @@ class DataTable(QWidget):
         """)
 
     def display_dataframe(self, df):
+
+        self.dataframe = df
         self.table.clear()
         rows = min(DATA_TABLE_MAX_ROWS, len(df))
         self.table.setRowCount(rows)
@@ -319,6 +322,19 @@ class ContentPage(QWidget):
         inner.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Expanding))
         inner.setStretch(inner.count() - 1, DATA_BOTTOM_SPACER_STR)
         root.addWidget(container)
+        self.dataframe = None
+
+        self.dataframe = None      # will store the current preview DataFrame
+
+        # optional but useful:
+        self.data_table = None 
+
+    def set_dataframe(self, df):
+        """Update the page's dataframe and push it to the table if available."""
+        self.dataframe = df
+        if self.data_table is not None:
+            # Adapt this to your DataTable API
+            self.data_table.setDataFrame(df)
 
 
 # -------- Results sub-window --------
@@ -435,6 +451,7 @@ def build_data_tab(page: ContentPage) -> DataTable:
     row = QHBoxLayout()
 
     data_table = DataTable()
+    page.data_table = data_table    # store reference in page
     row.addWidget(data_table, 1)
 
     side = QFrame()
@@ -456,6 +473,15 @@ def build_data_tab(page: ContentPage) -> DataTable:
     row.addWidget(side, 1)
 
     page.body.insertLayout(1 if page.title else 0, row, DATA_TABLE_STRETCH)
+
+    enable_column_distribution_menu(
+        data_table,
+        get_dataframe_callable=lambda: data_table.dataframe,
+        get_view_callable=lambda: data_table.table,  # the inner QTableWidget
+    )
+
+
+
     return data_table
 
 def build_parameters_tab(page: ContentPage):
