@@ -3,6 +3,9 @@
 
 import os
 import shutil
+from tab_utils import enable_column_distribution_menu
+from pages import trait_latent_page, bp_profile_page
+from pages import traits_ecosystem_analysis_page, group_analysis_page
 
 from PyQt5.QtCore import Qt, QStandardPaths
 from PyQt5.QtGui import QColor, QPalette
@@ -266,6 +269,8 @@ class DataTable(QWidget):
         """)
 
     def display_dataframe(self, df):
+
+        self.dataframe = df
         self.table.clear()
         rows = min(DATA_TABLE_MAX_ROWS, len(df))
         self.table.setRowCount(rows)
@@ -319,6 +324,19 @@ class ContentPage(QWidget):
         inner.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Expanding))
         inner.setStretch(inner.count() - 1, DATA_BOTTOM_SPACER_STR)
         root.addWidget(container)
+        self.dataframe = None
+
+        self.dataframe = None      # will store the current preview DataFrame
+
+        # optional but useful:
+        self.data_table = None 
+
+    def set_dataframe(self, df):
+        """Update the page's dataframe and push it to the table if available."""
+        self.dataframe = df
+        if self.data_table is not None:
+            # DataTable uses display_dataframe
+            self.data_table.display_dataframe(df)
 
 
 # -------- Results sub-window --------
@@ -384,9 +402,21 @@ class ResultWindow(QDialog):
             inner.addStretch(1)
             return box
 
-        for h in RESULT_BOX_HEIGHTS:
-            cv.addWidget(make_box(h))
-        cv.addStretch(1)
+       # for h in RESULT_BOX_HEIGHTS:
+       #     cv.addWidget(make_box(h))
+
+        if title == "Latent Traits":
+           cv.addWidget(trait_latent_page())
+        elif title == "B-P profiles":
+           cv.addWidget(bp_profile_page())
+        elif title == "Traits Ecosystem Analysis (TEA)":
+           cv.addWidget(traits_ecosystem_analysis_page())
+        elif title == "Group Analysis":
+           cv.addWidget(group_analysis_page())
+
+        else:
+            for h in RESULT_BOX_HEIGHTS:
+                cv.addWidget(make_box(h))
 
 class YesNoToggle(QWidget):
     """
@@ -435,6 +465,7 @@ def build_data_tab(page: ContentPage) -> DataTable:
     row = QHBoxLayout()
 
     data_table = DataTable()
+    page.data_table = data_table    # store reference in page
     row.addWidget(data_table, 1)
 
     side = QFrame()
@@ -456,6 +487,14 @@ def build_data_tab(page: ContentPage) -> DataTable:
     row.addWidget(side, 1)
 
     page.body.insertLayout(1 if page.title else 0, row, DATA_TABLE_STRETCH)
+
+    enable_column_distribution_menu(
+        data_table.table,  # QTableWidget
+        get_dataframe_callable=lambda: getattr(page.data_table, "dataframe", None)
+    )
+
+
+
     return data_table
 
 def build_parameters_tab(page: ContentPage):
@@ -529,7 +568,7 @@ def build_parameters_tab(page: ContentPage):
     cutoff_traits = QLineEdit()
     cutoff_traits.setFixedWidth(80)
     cutoff_traits.setStyleSheet(input_css)
-    cutoff_traits.setPlaceholderText("1000")        # suggestion only
+    cutoff_traits.setPlaceholderText("1000")       
     left_form.addRow(lbl_cutoff, cutoff_traits)
 
     # Traits activation rate
@@ -538,7 +577,7 @@ def build_parameters_tab(page: ContentPage):
     traits_activation = QLineEdit()
     traits_activation.setFixedWidth(80)
     traits_activation.setStyleSheet(input_css)
-    traits_activation.setPlaceholderText("1.0")     # suggestion only
+    traits_activation.setPlaceholderText("1.0")    
     left_form.addRow(lbl_act, traits_activation)
 
     # Prune yes/no
@@ -715,10 +754,9 @@ def build_results_tab(page: ContentPage):
     """
     Results tab:
     - 4 large cards (2x2 grid), centered horizontally and vertically.
-    - Download button centered below the cards.
+    - Two download buttons (PDF report and output data), stacked below the cards.
     """
-
-    # --- Clear the default spacer that ContentPage adds ---
+    # --- Clear default spacer ---
     while page.body.count():
         item = page.body.takeAt(0)
         w = item.widget()
@@ -728,14 +766,14 @@ def build_results_tab(page: ContentPage):
     root = QVBoxLayout()
     root.setSpacing(24)
 
-    # -------- central widget (cards + button) --------
+    # --- Central content ---
     center_widget = QWidget()
     center_layout = QVBoxLayout(center_widget)
     center_layout.setSpacing(32)
     center_layout.setContentsMargins(0, 0, 0, 0)
     center_layout.setAlignment(Qt.AlignCenter)
 
-    # --- Card buttons (2 x 2 grid) ---
+    # --- Card grid layout ---
     card_css = """
         QPushButton {
             background: white;
@@ -764,8 +802,8 @@ def build_results_tab(page: ContentPage):
 
     btn_bp    = QPushButton("B-P Profiles")
     btn_grp   = QPushButton("Group Analysis")
-    btn_trait = QPushButton("Traits Ecosystem")
-    btn_stat  = QPushButton("Statistics")
+    btn_trait = QPushButton("Latent Traits ")
+    btn_stat  = QPushButton("Traits Ecosystem Analysis (TEA)")
 
     for b in (btn_bp, btn_grp, btn_trait, btn_stat):
         b.setStyleSheet(card_css)
@@ -784,50 +822,58 @@ def build_results_tab(page: ContentPage):
 
     center_layout.addLayout(grid_wrapper)
 
-    # --- Download report primary button ---
-    dl = QPushButton("Download analytical report")
-    dl.setStyleSheet(f"""
-        QPushButton {{
-            background: {TEAL};
-            color: white;
-            border: none;
-            border-radius: 20px;
-            padding: 12px 26px;
-            font-family: '{APP_FONT_FAMILY}', 'Segoe UI', Arial, sans-serif;
-            font-size: 13pt;
-            font-weight: 600;
-        }}
-        QPushButton:hover {{
-            background: #2F7E76;
-        }}
-        QPushButton:pressed {{
-            background: #24635C;
-        }}
-    """)
-    dl_row = QHBoxLayout()
-    dl_row.addStretch(1)
-    dl_row.addWidget(dl)
-    dl_row.addStretch(1)
+    # --- Download buttons ---
+    def _styled_download_button(label):
+        btn = QPushButton(label)
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {TEAL};
+                color: white;
+                border: none;
+                border-radius: 20px;
+                padding: 12px 26px;
+                font-family: '{APP_FONT_FAMILY}', 'Segoe UI', Arial, sans-serif;
+                font-size: 13pt;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{
+                background: #2F7E76;
+            }}
+            QPushButton:pressed {{
+                background: #24635C;
+            }}
+        """)
+        return btn
 
-    center_layout.addLayout(dl_row)
+    dl_report = _styled_download_button("Download analytical report")
+    dl_output = _styled_download_button("Download raw output data (.zip)")
+    dl_report.setFixedWidth(250)
+    dl_output.setFixedWidth(250)
 
-    # -------- add central widget to page, vertically centered --------
-    root.addStretch(1)                                      # top
-    root.addWidget(center_widget, 0, Qt.AlignCenter)        # middle
-    root.addStretch(1)                                      # bottom
+    dl_box = QVBoxLayout()
+    dl_box.setSpacing(16)
+    dl_box.addWidget(dl_report, alignment=Qt.AlignCenter)
+    dl_box.addWidget(dl_output, alignment=Qt.AlignCenter)
+
+    center_layout.addLayout(dl_box)
+
+    # --- Add everything to root layout ---
+    root.addStretch(1)
+    root.addWidget(center_widget, 0, Qt.AlignCenter)
+    root.addStretch(1)
 
     page.body.addLayout(root)
 
-    # -------- Behaviour (unchanged) --------
+    # -------- Button behavior --------
     def open_win(title):
         w = ResultWindow(title, page)
         w.show()
         w.raise_()
 
     btn_bp.clicked.connect(lambda: open_win("B-P profiles"))
-    btn_grp.clicked.connect(lambda: open_win("Group analysis"))
-    btn_trait.clicked.connect(lambda: open_win("Traits ecosystem"))
-    btn_stat.clicked.connect(lambda: open_win("Statistics"))
+    btn_grp.clicked.connect(lambda: open_win("Group Analysis"))
+    btn_trait.clicked.connect(lambda: open_win("Latent Traits"))
+    btn_stat.clicked.connect(lambda: open_win("Traits Ecosystem Analysis (TEA)"))
 
     def _unique_path(path):
         if not os.path.exists(path):
@@ -860,9 +906,28 @@ def build_results_tab(page: ContentPage):
             QMessageBox.critical(page, "Download failed",
                                  f"Could not download the report:\n{e}")
 
-    dl.clicked.connect(download_report)
+    def download_output_data():
+        downloads_dir = (
+            QStandardPaths.writableLocation(QStandardPaths.DownloadLocation)
+            or os.path.expanduser("~/Downloads")
+        )
+        os.makedirs(downloads_dir, exist_ok=True)
+        dest = _unique_path(os.path.join(downloads_dir, "output_data.zip"))
+        src = os.path.join(os.getcwd(), "output_data.zip")
+        try:
+            if os.path.exists(src):
+                shutil.copyfile(src, dest)
+            else:
+                QMessageBox.warning(page, "Missing file", "No output_data.zip found in the working directory.")
+                return
+            QMessageBox.information(page, "Data downloaded", f"Output data saved to:\n{dest}")
+        except Exception as e:
+            QMessageBox.critical(page, "Download failed", f"Could not download the data:\n{e}")
 
-# -------------------- Tab widget styling & creation --------------------
+    dl_report.clicked.connect(download_report)
+    dl_output.clicked.connect(download_output_data)
+    
+    # -------------------- Tab widget styling & creation --------------------
 def _tab_stylesheet(active_bg: str) -> str:
     return f"""
         QTabWidget::tab-bar {{ left: {TABBAR_LEFT_OFFSET}px; top: {TABBAR_TOP_OFFSET}px; }}

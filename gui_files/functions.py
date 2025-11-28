@@ -42,6 +42,7 @@ def apply_data_table_fractional_sizes(win: QMainWindow):
 
 
 # -------------------- Upload logic --------------------
+
 def upload_file_and_display(tabs: QTabWidget):
     file_path, _ = QFileDialog.getOpenFileName(
         None, "Open File", "", "Data Files (*.csv *.xlsx *.tsv)"
@@ -62,7 +63,7 @@ def upload_file_and_display(tabs: QTabWidget):
             tabs.data_page.data_individuals.reset()
 
         # --- Show table ---
-        tabs.data_table.display_dataframe(df)
+        tabs.data_page.set_dataframe(df)
 
         # --- Populate selectors with fresh data ---
         if hasattr(tabs.data_page, "data_selector"):

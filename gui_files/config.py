@@ -85,7 +85,7 @@ BUTTONS_GROUP_VOFFSET_PX   = +100
 # --------- GIF LOADER --------------
 GIF_PATH        = "lotus_running.gif"
 GIF_WIDTH_PX    = 96
-GIF_DURATION_MS = 20000
+GIF_DURATION_MS = 12000 #time to show the gif
 # -----------------------------------
 
 # ---- Status caption styles ----
